@@ -438,7 +438,7 @@ class PGVector(VectorStore):
                 )
             if kwargs.get("source_ids", []):
                 stmt = stmt.where(
-                    self.EmbeddingStore.usource_idid.in_(kwargs.get("source_ids"))
+                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
                 )
             session.execute(stmt)
             session.commit()
@@ -466,7 +466,7 @@ class PGVector(VectorStore):
                 )
             if kwargs.get("source_ids", []):
                 stmt = stmt.where(
-                    self.EmbeddingStore.usource_idid.in_(kwargs.get("source_ids"))
+                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
                 )
             await session.execute(stmt)
             await session.commit()
@@ -690,9 +690,7 @@ class PGVector(VectorStore):
         assert not self._async_engine, "This method must be called without async_mode"
         embedding = self.embedding_function.embed_query(text=query)
         return self.similarity_search_by_vector(
-            embedding=embedding,
-            k=k,
-            filter=filter,
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
 
     async def asimilarity_search(
@@ -715,9 +713,7 @@ class PGVector(VectorStore):
         await self.__apost_init__()  # Lazy async init
         embedding = self.embedding_function.embed_query(text=query)
         return await self.asimilarity_search_by_vector(
-            embedding=embedding,
-            k=k,
-            filter=filter,
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
 
     def similarity_search_with_score(
@@ -725,6 +721,7 @@ class PGVector(VectorStore):
         query: str,
         k: int = 4,
         filter: Optional[dict] = None,
+        **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """Return docs most similar to query.
 
@@ -739,7 +736,7 @@ class PGVector(VectorStore):
         assert not self._async_engine, "This method must be called without async_mode"
         embedding = self.embedding_function.embed_query(query)
         docs = self.similarity_search_with_score_by_vector(
-            embedding=embedding, k=k, filter=filter
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
         return docs
 
@@ -748,6 +745,7 @@ class PGVector(VectorStore):
         query: str,
         k: int = 4,
         filter: Optional[dict] = None,
+        **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         """Return docs most similar to query.
 
@@ -762,7 +760,7 @@ class PGVector(VectorStore):
         await self.__apost_init__()  # Lazy async init
         embedding = self.embedding_function.embed_query(query)
         docs = await self.asimilarity_search_with_score_by_vector(
-            embedding=embedding, k=k, filter=filter
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
         return docs
 
@@ -785,9 +783,12 @@ class PGVector(VectorStore):
         embedding: List[float],
         k: int = 4,
         filter: Optional[dict] = None,
+        **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         assert not self._async_engine, "This method must be called without async_mode"
-        results = self.__query_collection(embedding=embedding, k=k, filter=filter)
+        results = self.__query_collection(
+            embedding=embedding, k=k, filter=filter, **kwargs
+        )
 
         return self._results_to_docs_and_scores(results)
 
@@ -796,11 +797,12 @@ class PGVector(VectorStore):
         embedding: List[float],
         k: int = 4,
         filter: Optional[dict] = None,
+        **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         await self.__apost_init__()  # Lazy async init
         async with self._make_async_session() as session:  # type: ignore[arg-type]
             results = await self.__aquery_collection(
-                session=session, embedding=embedding, k=k, filter=filter
+                session=session, embedding=embedding, k=k, filter=filter, **kwargs
             )
 
             return self._results_to_docs_and_scores(results)
@@ -1051,21 +1053,36 @@ class PGVector(VectorStore):
         embedding: List[float],
         k: int = 4,
         filter: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
     ) -> Sequence[Any]:
         """Query the collection."""
         with self._make_sync_session() as session:  # type: ignore[arg-type]
+            query = session.query(
+                self.EmbeddingStore,
+                self.distance_strategy(embedding).label("distance"),
+            )
+
+            if kwargs.get("ids", []):
+                query = query.filter(self.EmbeddingStore.id.in_(kwargs.get("ids")))
+            if kwargs.get("uids", []):
+                query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+            if kwargs.get("directory_ids", []):
+                query = query.where(
+                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
+                )
+            if kwargs.get("source_ids", []):
+                query = query.where(
+                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
+                )
+
             filter_by = []
             if filter:
                 filter_clauses = self._create_filter_clause(filter)
-                if filter_clauses is not None:
+                if filter_clauses:
                     filter_by.append(filter_clauses)
 
             results: List[Any] = (
-                session.query(
-                    self.EmbeddingStore,
-                    self.distance_strategy(embedding).label("distance"),
-                )
-                .filter(*filter_by)
+                query.filter(*filter_by)
                 .order_by(sqlalchemy.asc("distance"))
                 .limit(k)
                 .all()
@@ -1079,9 +1096,28 @@ class PGVector(VectorStore):
         embedding: List[float],
         k: int = 4,
         filter: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
     ) -> Sequence[Any]:
         """Query the collection."""
         async with self._make_async_session() as session:  # type: ignore[arg-type]
+            query = select(
+                self.EmbeddingStore,
+                self.distance_strategy(embedding).label("distance"),
+            )
+
+            if kwargs.get("ids", []):
+                query = query.filter(self.EmbeddingStore.id.in_(kwargs.get("ids")))
+            if kwargs.get("uids", []):
+                query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+            if kwargs.get("directory_ids", []):
+                query = query.where(
+                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
+                )
+            if kwargs.get("source_ids", []):
+                query = query.where(
+                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
+                )
+
             filter_by = []
             if filter:
                 filter_clauses = self._create_filter_clause(filter)
@@ -1089,13 +1125,7 @@ class PGVector(VectorStore):
                     filter_by.append(filter_clauses)
 
             stmt = (
-                select(
-                    self.EmbeddingStore,
-                    self.distance_strategy(embedding).label("distance"),
-                )
-                .filter(*filter_by)
-                .order_by(sqlalchemy.asc("distance"))
-                .limit(k)
+                query.filter(*filter_by).order_by(sqlalchemy.asc("distance")).limit(k)
             )
 
             results: Sequence[Any] = (await session.execute(stmt)).all()
@@ -1121,7 +1151,7 @@ class PGVector(VectorStore):
         """
         assert not self._async_engine, "This method must be called without async_mode"
         docs_and_scores = self.similarity_search_with_score_by_vector(
-            embedding=embedding, k=k, filter=filter
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
         return _results_to_docs(docs_and_scores)
 
@@ -1145,7 +1175,7 @@ class PGVector(VectorStore):
         assert self._async_engine, "This method must be called with async_mode"
         await self.__apost_init__()  # Lazy async init
         docs_and_scores = await self.asimilarity_search_with_score_by_vector(
-            embedding=embedding, k=k, filter=filter
+            embedding=embedding, k=k, filter=filter, **kwargs
         )
         return _results_to_docs(docs_and_scores)
 
@@ -1460,7 +1490,9 @@ class PGVector(VectorStore):
                 relevance to the query and score for each.
         """
         assert not self._async_engine, "This method must be called without async_mode"
-        results = self.__query_collection(embedding=embedding, k=fetch_k, filter=filter)
+        results = self.__query_collection(
+            embedding=embedding, k=fetch_k, filter=filter, **kwargs
+        )
 
         embedding_list = [result.EmbeddingStore.embedding for result in results]
 
@@ -1469,6 +1501,7 @@ class PGVector(VectorStore):
             embedding_list,
             k=k,
             lambda_mult=lambda_mult,
+            **kwargs,
         )
 
         candidates = self._results_to_docs_and_scores(results)
@@ -1508,7 +1541,7 @@ class PGVector(VectorStore):
         await self.__apost_init__()  # Lazy async init
         async with self._make_async_session() as session:
             results = await self.__aquery_collection(
-                session=session, embedding=embedding, k=fetch_k, filter=filter
+                session=session, embedding=embedding, k=fetch_k, filter=filter, **kwargs
             )
 
             embedding_list = [result.EmbeddingStore.embedding for result in results]
@@ -1518,6 +1551,7 @@ class PGVector(VectorStore):
                 embedding_list,
                 k=k,
                 lambda_mult=lambda_mult,
+                **kwargs,
             )
 
             candidates = self._results_to_docs_and_scores(results)
