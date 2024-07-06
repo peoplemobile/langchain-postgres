@@ -84,9 +84,7 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
 
         __tablename__ = "jarvis_langchain_pg_embedding"
 
-        id = sqlalchemy.Column(
-            sqlalchemy.String, nullable=False, primary_key=True
-        )
+        id = sqlalchemy.Column(sqlalchemy.String, nullable=False, primary_key=True)
 
         embedding: Vector = sqlalchemy.Column(Vector(vector_dimension))  # type: ignore
         source_id = sqlalchemy.Column(
@@ -419,49 +417,58 @@ class PGVector(VectorStore):
 
     def delete(
         self,
-        ids: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> None:
-        """Delete vectors by ids or uuids.
+        """Delete vectors by ids, uids, directory_ids, source_ids
 
         Args:
-            ids: List of ids to delete.
+            kwargs: uids, directory_ids, source_ids, or ids
         """
         with self._make_sync_session() as session:
-            if ids is not None:
-                self.logger.debug(
-                    "Trying to delete vectors by ids (represented by the model "
-                    "using the custom ids field)"
-                )
+            stmt = delete(self.EmbeddingStore)
 
-                stmt = delete(self.EmbeddingStore).where(
-                    self.EmbeddingStore.id.in_(ids)
+            if kwargs.get("ids", []):
+                stmt = stmt.where(self.EmbeddingStore.id.in_(kwargs.get("ids")))
+
+            if kwargs.get("uids", []):
+                stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+            if kwargs.get("directory_ids", []):
+                stmt = stmt.where(
+                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
                 )
-                session.execute(stmt)
+            if kwargs.get("source_ids", []):
+                stmt = stmt.where(
+                    self.EmbeddingStore.usource_idid.in_(kwargs.get("source_ids"))
+                )
+            session.execute(stmt)
             session.commit()
 
     async def adelete(
         self,
-        ids: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> None:
-        """Async delete vectors by ids or uuids.
+        """Async delete vectors by ids, uids, directory_ids, source_ids.
 
         Args:
-            ids: List of ids to delete.
+            kwargs: uids, directory_ids, source_ids, or ids
         """
         await self.__apost_init__()  # Lazy async init
         async with self._make_async_session() as session:
-            if ids is not None:
-                self.logger.debug(
-                    "Trying to delete vectors by ids (represented by the model "
-                    "using the custom ids field)"
-                )
+            stmt = delete(self.EmbeddingStore)
 
-                stmt = delete(self.EmbeddingStore).where(
-                    self.EmbeddingStore.id.in_(ids)
+            if kwargs.get("ids", []):
+                stmt = stmt.where(self.EmbeddingStore.id.in_(kwargs.get("ids")))
+            if kwargs.get("uids", []):
+                stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+            if kwargs.get("directory_ids", []):
+                stmt = stmt.where(
+                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
                 )
-                await session.execute(stmt)
+            if kwargs.get("source_ids", []):
+                stmt = stmt.where(
+                    self.EmbeddingStore.usource_idid.in_(kwargs.get("source_ids"))
+                )
+            await session.execute(stmt)
             await session.commit()
 
     @classmethod
@@ -810,7 +817,7 @@ class PGVector(VectorStore):
             )
             for result in results
         ]
-        return docs #type: ignore
+        return docs  # type: ignore
 
     def _handle_field_filter(
         self,
