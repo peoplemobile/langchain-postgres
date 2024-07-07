@@ -4,8 +4,20 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
-from typing import (Any, AsyncGenerator, Callable, Dict, Generator, Iterable,
-                    List, Optional, Sequence, Tuple, Type, Union)
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 from typing import cast as typing_cast
 
 import numpy as np
@@ -14,14 +26,16 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import (SQLColumnExpression, cast, create_engine, delete, func,
-                        select)
+from sqlalchemy import SQLColumnExpression, cast, create_engine, delete, func, select
 from sqlalchemy.dialects.postgresql import JSONB, JSONPATH, insert
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession,
-                                    async_sessionmaker, create_async_engine)
-from sqlalchemy.orm import (Session, declarative_base, scoped_session,
-                            sessionmaker)
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import Session, declarative_base, scoped_session, sessionmaker
 
 from langchain_postgres._utils import maximal_marginal_relevance
 
@@ -84,7 +98,9 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
 
         __tablename__ = "jarvis_langchain_pg_embedding"
 
-        id = sqlalchemy.Column(sqlalchemy.String, nullable=False, primary_key=True)
+        id = sqlalchemy.Column(
+            sqlalchemy.BigInteger, autoincrement=True, nullable=False, primary_key=True
+        )
 
         embedding: Vector = sqlalchemy.Column(Vector(vector_dimension))  # type: ignore
         source_id = sqlalchemy.Column(
@@ -426,20 +442,26 @@ class PGVector(VectorStore):
         """
         with self._make_sync_session() as session:
             stmt = delete(self.EmbeddingStore)
-
-            if kwargs.get("ids", []):
-                stmt = stmt.where(self.EmbeddingStore.id.in_(kwargs.get("ids")))
-
+            delete_all = True
             if kwargs.get("uids", []):
                 stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+                delete_all = False
             if kwargs.get("directory_ids", []):
                 stmt = stmt.where(
                     self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
                 )
+                delete_all = False
             if kwargs.get("source_ids", []):
                 stmt = stmt.where(
                     self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
                 )
+                delete_all = False
+
+            if delete_all:
+                raise Exception(
+                    "You must provide at least one of uids, directory_ids, or source_ids"
+                )
+
             session.execute(stmt)
             session.commit()
 
@@ -455,19 +477,27 @@ class PGVector(VectorStore):
         await self.__apost_init__()  # Lazy async init
         async with self._make_async_session() as session:
             stmt = delete(self.EmbeddingStore)
+            delete_all = True
 
-            if kwargs.get("ids", []):
-                stmt = stmt.where(self.EmbeddingStore.id.in_(kwargs.get("ids")))
             if kwargs.get("uids", []):
                 stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
+                delete_all = False
             if kwargs.get("directory_ids", []):
                 stmt = stmt.where(
                     self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
                 )
+                delete_all = False
             if kwargs.get("source_ids", []):
                 stmt = stmt.where(
                     self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
                 )
+                delete_all = False
+
+            if delete_all:
+                raise Exception(
+                    "You must provide at least one of uids, directory_ids, or source_ids"
+                )
+
             await session.execute(stmt)
             await session.commit()
 
@@ -538,7 +568,6 @@ class PGVector(VectorStore):
         with self._make_sync_session() as session:  # type: ignore[arg-type]
             data = [
                 {
-                    "id": meta["id"],
                     "embedding": embedding,
                     "document": text,
                     "uid": meta["uid"],
@@ -549,22 +578,10 @@ class PGVector(VectorStore):
                 for text, meta, embedding in zip(texts, metadatas, embeddings)  # type: ignore
             ]
             stmt = insert(self.EmbeddingStore).values(data)
-            on_conflict_stmt = stmt.on_conflict_do_update(
-                index_elements=["id"],
-                # Conflict detection based on these columns
-                set_={
-                    "embedding": stmt.excluded.embedding,
-                    "document": stmt.excluded.document,
-                    "cmetadata": stmt.excluded.cmetadata,
-                    "uid": stmt.excluded.uid,
-                    "directory_id": stmt.excluded.directory_id,
-                    "source_id": stmt.excluded.source_id,
-                },
-            )
-            session.execute(on_conflict_stmt)
+            session.execute(stmt)
             session.commit()
 
-        return [meta["id"] for meta in metadatas]  # type: ignore
+        return []  # TODO: return inserted primary keys
 
     async def aadd_embeddings(
         self,
@@ -588,7 +605,6 @@ class PGVector(VectorStore):
         async with self._make_async_session() as session:  # type: ignore[arg-type]
             data = [
                 {
-                    "id": meta["id"],
                     "embedding": embedding,
                     "document": text,
                     "uid": meta["uid"],
@@ -599,22 +615,10 @@ class PGVector(VectorStore):
                 for text, meta, embedding in zip(texts, metadatas, embeddings)  # type: ignore
             ]
             stmt = insert(self.EmbeddingStore).values(data)
-            on_conflict_stmt = stmt.on_conflict_do_update(
-                index_elements=["id"],
-                # Conflict detection based on these columns
-                set_={
-                    "embedding": stmt.excluded.embedding,
-                    "document": stmt.excluded.document,
-                    "cmetadata": stmt.excluded.cmetadata,
-                    "uid": stmt.excluded.uid,
-                    "directory_id": stmt.excluded.directory_id,
-                    "source_id": stmt.excluded.source_id,
-                },
-            )
-            await session.execute(on_conflict_stmt)
+            await session.execute(stmt)
             await session.commit()
 
-        return [meta["id"] for meta in metadatas]  # type: ignore
+        return []  # TODO: return inserted primary keys
 
     def add_texts(
         self,
