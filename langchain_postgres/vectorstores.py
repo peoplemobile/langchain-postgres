@@ -833,7 +833,7 @@ class PGVector(VectorStore):
                     result.distance,
                 )
             )
-            hit_docs_brief.append((result.EmbeddingStore.id, result.distance))
+            hit_docs_brief.append((result.EmbeddingStore.id, 1.0 - result.distance))
 
         self.logger.info(f"Hit docs: {hit_docs_brief}")
 
