@@ -821,17 +821,23 @@ class PGVector(VectorStore):
 
     def _results_to_docs_and_scores(self, results: Any) -> List[Tuple[Document, float]]:
         """Return docs and scores from results."""
-        docs = [
-            (
-                Document(
-                    page_content=result.EmbeddingStore.document,
-                    metadata=result.EmbeddingStore.cmetadata,
-                ),
-                result.distance if self.embedding_function is not None else None,
+        docs: List[Tuple[Document, float]] = []
+        hit_docs_brief: List[Tuple[int, float]] = []
+        for result in results:
+            docs.append(
+                (
+                    Document(
+                        page_content=result.EmbeddingStore.document,
+                        metadata=result.EmbeddingStore.cmetadata,
+                    ),
+                    result.distance,
+                )
             )
-            for result in results
-        ]
-        return docs  # type: ignore
+            hit_docs_brief.append((result.EmbeddingStore.id, result.distance))
+
+        self.logger.info(f"Hit docs: {hit_docs_brief}")
+
+        return docs
 
     def _handle_field_filter(
         self,
