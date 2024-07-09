@@ -26,7 +26,15 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import SQLColumnExpression, cast, create_engine, delete, func, select
+from sqlalchemy import (
+    SQLColumnExpression,
+    cast,
+    create_engine,
+    delete,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB, JSONPATH, insert
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.ext.asyncio import (
@@ -102,7 +110,6 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
             sqlalchemy.BigInteger, autoincrement=True, nullable=False, primary_key=True
         )
 
-        embedding: Vector = sqlalchemy.Column(Vector(vector_dimension))  # type: ignore
         source_id = sqlalchemy.Column(
             sqlalchemy.String(255), nullable=False, index=True
         )
@@ -110,8 +117,9 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
         directory_id = sqlalchemy.Column(
             sqlalchemy.String(255), nullable=False, index=True
         )
-        document = sqlalchemy.Column(sqlalchemy.String, nullable=True)
         cmetadata = sqlalchemy.Column(JSONB, nullable=True)
+        document = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+        embedding: Vector = sqlalchemy.Column(Vector(vector_dimension))  # type: ignore
 
         __table_args__ = (
             sqlalchemy.Index(
@@ -1066,18 +1074,23 @@ class PGVector(VectorStore):
                 self.distance_strategy(embedding).label("distance"),
             )
 
-            if kwargs.get("ids", []):
-                query = query.filter(self.EmbeddingStore.id.in_(kwargs.get("ids")))
             if kwargs.get("uids", []):
                 query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
-            if kwargs.get("directory_ids", []):
+
+            directory_ids = kwargs.get("directory_ids", [])
+            source_ids = kwargs.get("source_ids", [])
+
+            if directory_ids and source_ids:
                 query = query.where(
-                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
+                    or_(
+                        self.EmbeddingStore.directory_id.in_(directory_ids),
+                        self.EmbeddingStore.source_id.in_(source_ids),
+                    )
                 )
-            if kwargs.get("source_ids", []):
-                query = query.where(
-                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
-                )
+            elif directory_ids:
+                query = query.where(self.EmbeddingStore.directory_id.in_(directory_ids))
+            elif source_ids:
+                query = query.where(self.EmbeddingStore.source_id.in_(source_ids))
 
             filter_by = []
             if filter:
@@ -1109,18 +1122,22 @@ class PGVector(VectorStore):
                 self.distance_strategy(embedding).label("distance"),
             )
 
-            if kwargs.get("ids", []):
-                query = query.filter(self.EmbeddingStore.id.in_(kwargs.get("ids")))
             if kwargs.get("uids", []):
                 query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
-            if kwargs.get("directory_ids", []):
+            directory_ids = kwargs.get("directory_ids", [])
+            source_ids = kwargs.get("source_ids", [])
+
+            if directory_ids and source_ids:
                 query = query.where(
-                    self.EmbeddingStore.directory_id.in_(kwargs.get("directory_ids"))
+                    or_(
+                        self.EmbeddingStore.directory_id.in_(directory_ids),
+                        self.EmbeddingStore.source_id.in_(source_ids),
+                    )
                 )
-            if kwargs.get("source_ids", []):
-                query = query.where(
-                    self.EmbeddingStore.source_id.in_(kwargs.get("source_ids"))
-                )
+            elif directory_ids:
+                query = query.where(self.EmbeddingStore.directory_id.in_(directory_ids))
+            elif source_ids:
+                query = query.where(self.EmbeddingStore.source_id.in_(source_ids))
 
             filter_by = []
             if filter:
