@@ -650,6 +650,12 @@ class PGVector(VectorStore):
         embeddings = self.embedding_function.embed_documents(list(texts))
 
         # temporary fix for the case where the embeddings are not of the same length
+        if len(embeddings) != len(list(texts)):
+            raise ValueError(
+                f"Embedding length mismatch. Expected {len(list(texts))}, "
+                f"but got {len(embeddings)}"
+            )
+
         for e in embeddings:
             if len(e) != self._embedding_length:
                 raise ValueError(
@@ -686,6 +692,11 @@ class PGVector(VectorStore):
         embeddings = await self.embedding_function.aembed_documents(list(texts))
 
         # temporary fix for the case where the embeddings are not of the same length
+        if len(embeddings) != len(list(texts)):
+            raise ValueError(
+                f"Embedding length mismatch. Expected {len(list(texts))}, "
+                f"but got {len(embeddings)}"
+            )
         for e in embeddings:
             if len(e) != self._embedding_length:
                 raise ValueError(
