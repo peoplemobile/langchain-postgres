@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
+import math
 from typing import (
     Any,
     AsyncGenerator,
@@ -662,6 +663,10 @@ class PGVector(VectorStore):
                     f"Embedding length mismatch. Expected {self._embedding_length}, "
                     f"but got {len(e)}"
                 )
+            for i in e:
+                if math.isnan(i):
+                    self.logger.info(f"embeddings: {embeddings}")
+                    raise ValueError("NaN in embeddings")
 
         return self.add_embeddings(
             texts=texts,
@@ -703,6 +708,11 @@ class PGVector(VectorStore):
                     f"Embedding length mismatch. Expected {self._embedding_length}, "
                     f"but got {len(e)}"
                 )
+            for i in e:
+                if math.isnan(i):
+                    self.logger.info(f"embeddings: {embeddings}")
+                    raise ValueError("NaN in embeddings")
+
         return await self.aadd_embeddings(
             texts=texts,
             embeddings=embeddings,
