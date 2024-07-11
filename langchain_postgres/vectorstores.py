@@ -648,6 +648,15 @@ class PGVector(VectorStore):
         """
         assert not self._async_engine, "This method must be called without async_mode"
         embeddings = self.embedding_function.embed_documents(list(texts))
+
+        # temporary fix for the case where the embeddings are not of the same length
+        for e in embeddings:
+            if len(e) != self._embedding_length:
+                raise ValueError(
+                    f"Embedding length mismatch. Expected {self._embedding_length}, "
+                    f"but got {len(e)}"
+                )
+
         return self.add_embeddings(
             texts=texts,
             embeddings=embeddings,
@@ -675,6 +684,14 @@ class PGVector(VectorStore):
         """
         await self.__apost_init__()  # Lazy async init
         embeddings = await self.embedding_function.aembed_documents(list(texts))
+
+        # temporary fix for the case where the embeddings are not of the same length
+        for e in embeddings:
+            if len(e) != self._embedding_length:
+                raise ValueError(
+                    f"Embedding length mismatch. Expected {self._embedding_length}, "
+                    f"but got {len(e)}"
+                )
         return await self.aadd_embeddings(
             texts=texts,
             embeddings=embeddings,
