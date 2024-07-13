@@ -4,20 +4,8 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
-from typing import (
-    Any,
-    AsyncGenerator,
-    Callable,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import (Any, AsyncGenerator, Callable, Dict, Generator, Iterable,
+                    List, Optional, Sequence, Tuple, Type, Union)
 from typing import cast as typing_cast
 
 import numpy as np
@@ -26,24 +14,14 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import (
-    SQLColumnExpression,
-    cast,
-    create_engine,
-    delete,
-    func,
-    or_,
-    select,
-)
+from sqlalchemy import (SQLColumnExpression, cast, create_engine, delete, func,
+                        or_, select)
 from sqlalchemy.dialects.postgresql import JSONB, JSONPATH, insert
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-from sqlalchemy.orm import Session, declarative_base, scoped_session, sessionmaker
+from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession,
+                                    async_sessionmaker, create_async_engine)
+from sqlalchemy.orm import (Session, declarative_base, scoped_session,
+                            sessionmaker)
 
 from langchain_postgres._utils import maximal_marginal_relevance
 
@@ -117,18 +95,9 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
         directory_id = sqlalchemy.Column(
             sqlalchemy.String(255), nullable=False, index=True
         )
-        cmetadata = sqlalchemy.Column(JSONB, nullable=True)
-        document = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+        cmetadata = sqlalchemy.Column(JSONB, nullable=False)
+        document = sqlalchemy.Column(sqlalchemy.String, nullable=False)
         embedding: Vector = sqlalchemy.Column(Vector(vector_dimension))  # type: ignore
-
-        __table_args__ = (
-            sqlalchemy.Index(
-                "jarvis_ix_cmetadata_gin",
-                "cmetadata",
-                postgresql_using="gin",
-                postgresql_ops={"cmetadata": "jsonb_path_ops"},
-            ),
-        )
 
     return EmbeddingStore
 
