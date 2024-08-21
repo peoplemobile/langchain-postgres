@@ -4,8 +4,20 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
-from typing import (Any, AsyncGenerator, Callable, Dict, Generator, Iterable,
-                    List, Optional, Sequence, Tuple, Type, Union)
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 from typing import cast as typing_cast
 
 import numpy as np
@@ -14,14 +26,24 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from langchain_core.vectorstores import VectorStore
-from sqlalchemy import (SQLColumnExpression, cast, create_engine, delete, func,
-                        or_, select)
+from sqlalchemy import (
+    SQLColumnExpression,
+    cast,
+    create_engine,
+    delete,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB, JSONPATH, insert
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession,
-                                    async_sessionmaker, create_async_engine)
-from sqlalchemy.orm import (Session, declarative_base, scoped_session,
-                            sessionmaker)
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import Session, declarative_base, scoped_session, sessionmaker
 
 from langchain_postgres._utils import maximal_marginal_relevance
 
@@ -87,6 +109,8 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
         id = sqlalchemy.Column(
             sqlalchemy.BigInteger, autoincrement=True, nullable=False, primary_key=True
         )
+
+        namespace = sqlalchemy.Column(sqlalchemy.String(64), nullable=False)
 
         source_id = sqlalchemy.Column(
             sqlalchemy.String(255), nullable=False, index=True
@@ -412,14 +436,20 @@ class PGVector(VectorStore):
         self,
         **kwargs: Any,
     ) -> None:
-        """Delete vectors by ids, uids, directory_ids, source_ids
+        """Delete vectors by namespace, ids, uids, directory_ids, source_ids
 
         Args:
-            kwargs: uids, directory_ids, source_ids, or ids
+            kwargs: namespace, uids, directory_ids, source_ids, or ids
         """
         with self._make_sync_session() as session:
             stmt = delete(self.EmbeddingStore)
             delete_all = True
+            if kwargs.get("namespace", ""):
+                stmt = stmt.where(
+                    self.EmbeddingStore.namespace == kwargs.get("namespace")
+                )
+                delete_all = False
+
             if kwargs.get("uids", []):
                 stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
                 delete_all = False
@@ -436,7 +466,7 @@ class PGVector(VectorStore):
 
             if delete_all:
                 raise Exception(
-                    "You must provide at least one of uids, directory_ids, or source_ids"
+                    "You must provide at least one of namespace, uids, directory_ids, or source_ids"
                 )
 
             session.execute(stmt)
@@ -446,15 +476,20 @@ class PGVector(VectorStore):
         self,
         **kwargs: Any,
     ) -> None:
-        """Async delete vectors by ids, uids, directory_ids, source_ids.
+        """Async delete vectors by namespace, ids, uids, directory_ids, source_ids.
 
         Args:
-            kwargs: uids, directory_ids, source_ids, or ids
+            kwargs: namespace, uids, directory_ids, source_ids, or ids
         """
         await self.__apost_init__()  # Lazy async init
         async with self._make_async_session() as session:
             stmt = delete(self.EmbeddingStore)
             delete_all = True
+            if kwargs.get("namespace", ""):
+                stmt = stmt.where(
+                    self.EmbeddingStore.namespace == kwargs.get("namespace")
+                )
+                delete_all = False
 
             if kwargs.get("uids", []):
                 stmt = stmt.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
@@ -472,7 +507,7 @@ class PGVector(VectorStore):
 
             if delete_all:
                 raise Exception(
-                    "You must provide at least one of uids, directory_ids, or source_ids"
+                    "You must provide at least one of namespace, uids, directory_ids, or source_ids"
                 )
 
             await session.execute(stmt)
@@ -547,6 +582,7 @@ class PGVector(VectorStore):
                 {
                     "embedding": embedding,
                     "document": text,
+                    "namespace": meta.get("namespace", "agi_dev"),
                     "uid": meta["uid"],
                     "directory_id": meta["directory_id"],
                     "source_id": meta["source_id"],
@@ -584,6 +620,7 @@ class PGVector(VectorStore):
                 {
                     "embedding": embedding,
                     "document": text,
+                    "namespace": meta.get("namespace", "agi_dev"),
                     "uid": meta["uid"],
                     "directory_id": meta["directory_id"],
                     "source_id": meta["source_id"],
@@ -1049,6 +1086,11 @@ class PGVector(VectorStore):
                 self.distance_strategy(embedding).label("distance"),
             )
 
+            if kwargs.get("namespace", ""):
+                query = query.where(
+                    self.EmbeddingStore.namespace == kwargs.get("namespace")
+                )
+
             if kwargs.get("uids", []):
                 query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
 
@@ -1096,6 +1138,10 @@ class PGVector(VectorStore):
                 self.EmbeddingStore,
                 self.distance_strategy(embedding).label("distance"),
             )
+            if kwargs.get("namespace", ""):
+                query = query.where(
+                    self.EmbeddingStore.namespace == kwargs.get("namespace")
+                )
 
             if kwargs.get("uids", []):
                 query = query.where(self.EmbeddingStore.uid.in_(kwargs.get("uids")))
