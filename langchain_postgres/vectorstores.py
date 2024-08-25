@@ -110,7 +110,7 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
             sqlalchemy.BigInteger, autoincrement=True, nullable=False, primary_key=True
         )
 
-        namespace = sqlalchemy.Column(sqlalchemy.String(32), nullable=False)
+        namespace = sqlalchemy.Column(sqlalchemy.String(32), nullable=False, index=True)
 
         source_id = sqlalchemy.Column(
             sqlalchemy.String(255), nullable=False, index=True
