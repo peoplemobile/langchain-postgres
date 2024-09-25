@@ -47,7 +47,7 @@ class LangchainKeyValueStores(Base):  # type: ignore[valid-type,misc]
     # Prior to modifying this table, please determine whether
     # we should create migrations for this table to make sure
     # users do not experience data loss.
-    __tablename__ = "langchain_key_value_stores"
+    __tablename__ = "ai_core.langchain_key_value_stores"
 
     namespace: Mapped[str] = mapped_column(String(64), primary_key=True, nullable=False)
     key: Mapped[str] = mapped_column(String(255), primary_key=True, nullable=False)

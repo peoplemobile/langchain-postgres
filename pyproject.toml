@@ -1,14 +1,11 @@
 [tool.poetry]
 name = "langchain-postgres"
-version = "0.0.9"
+version = "0.0.10"
 description = "An integration package connecting Postgres and LangChain"
 authors = []
 readme = "README.md"
 repository = "https://github.com/langchain-ai/langchain-postgres"
 license = "MIT"
-
-[tool.poetry.urls]
-"Source Code" = "https://github.com/langchain-ai/langchain-postgres/tree/master/langchain_postgres"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0.0"
@@ -58,7 +55,7 @@ select = [
 ]
 
 [tool.mypy]
-disallow_untyped_defs = "True"
+disallow_untyped_defs = true
 
 [tool.coverage.run]
 omit = [

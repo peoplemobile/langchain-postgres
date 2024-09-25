@@ -104,7 +104,7 @@ def _get_embedding_store(vector_dimension: Optional[int] = None) -> Any:
     class EmbeddingStore(Base):
         """Embedding store."""
 
-        __tablename__ = "jarvis_langchain_pg_embedding"
+        __tablename__ = "ai_core.jarvis_langchain_pg_embedding"
 
         id = sqlalchemy.Column(
             sqlalchemy.BigInteger, autoincrement=True, nullable=False, primary_key=True
